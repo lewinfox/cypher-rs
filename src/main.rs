@@ -13,6 +13,7 @@ enum Mode {
 }
 
 fn usage() {
+    // Print a usage message and exit with code 1
     let msg = "Usage: cypher [-ed] <key> <text>";
     let msg2 = "  `key` and `text` are assumed to be files to be read. If no files are found they \
                 are treated as literal strings.";
@@ -22,19 +23,24 @@ fn usage() {
 }
 
 fn clean_string(s: &mut String) -> String {
+    // Remove whitespace and punctuation, uppercase everything
     let mut out = s.to_uppercase();
     out.retain(|c| !c.is_whitespace() && !c.is_ascii_punctuation());
     out
 }
 
-fn nums_to_string(nums: &Vec<usize>) -> String {
-    nums.into_iter().map(|&n| &LETTERS[n]).collect()
+fn nums_to_string(nums: &Vec<i8>) -> String {
+    // Convert an array of numbers into letters
+    nums.into_iter().map(|&n| &LETTERS[n as usize]).collect()
 }
 
-fn string_to_nums(s: &String) -> Vec<usize> {
-    // Get the index of a character in the alphabet (zero-indexed)
-    fn char_to_num(c: &char, letters: &[char; 26]) -> usize {
-        letters.iter().position(|&x| x == *c).unwrap()
+fn string_to_nums(s: &String) -> Vec<i8> {
+    // Convert a string to an array of numbers
+
+    fn char_to_num(c: &char, letters: &[char; 26]) -> i8 {
+        // Get the index of a character in the alphabet (zero-indexed)
+        let n = letters.iter().position(|&x| x == *c).unwrap();
+        n as i8
     }
 
     let c: Vec<char> = s.chars().collect();
@@ -42,6 +48,7 @@ fn string_to_nums(s: &String) -> Vec<usize> {
 }
 
 fn read_file(filename: &String) -> String {
+    // Read a file into a String
     let contents = fs::read_to_string(filename);
     let mut out = match contents {
         Ok(file) => file,
@@ -58,7 +65,6 @@ fn normalise_key_length(key: &mut String, text: &String) {
     let text_len = text.len();
     let key_len = key.len();
     if text_len > key_len {
-        println!("Key too short: is {}, should be {}", key_len, text_len);
         let n_reps = text_len / key_len; // Integer division because usize
         if text_len % key_len == 0 {
             key.repeat(n_reps);
@@ -74,16 +80,35 @@ fn normalise_key_length(key: &mut String, text: &String) {
 }
 
 fn encrypt(key: &String, plaintext: &String) -> String {
+    // Convert to numeric, add mod 26
     let num_key = string_to_nums(key);
     let num_text = string_to_nums(plaintext);
     let zipper = num_key.iter().zip(num_text.iter());
+
     let out_nums = zipper
         .map(|x| {
             let (k, t) = x;
             (t + k) % 26
         })
         .collect();
-    println!("Out nums: {:?}", out_nums);
+    let out_text = nums_to_string(&out_nums);
+    out_text
+}
+
+fn decrypt(key: &String, cyphertext: &String) -> String {
+    // Subtract key from text mod 26
+    let num_key = string_to_nums(key);
+    let num_text = string_to_nums(cyphertext);
+    let zipper = num_key.iter().zip(num_text.iter());
+
+    let out_nums = zipper
+        .map(|x| {
+            let (k, t) = x;
+            let out = (t - k) % 26;
+            out
+        })
+        .collect();
+
     let out_text = nums_to_string(&out_nums);
     out_text
 }
@@ -111,13 +136,14 @@ fn main() {
     normalise_key_length(&mut key_text, &input_text);
     println!("Key:  {} => {:?}", key_text, string_to_nums(&key_text));
     println!("Text: {} => {:?}", input_text, string_to_nums(&input_text));
+    let out: String;
     match mode {
         Mode::Encrypt => {
-            let out = encrypt(&key_text, &input_text);
-            println!("Output: {}", out);
+            out = encrypt(&key_text, &input_text);
         }
         Mode::Decrypt => {
-            println!("Not implemented yet");
+            out = decrypt(&key_text, &input_text);
         }
     }
+    println!("Output: {}", out);
 }
